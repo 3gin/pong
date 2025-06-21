@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .game-container {
+            text-align: center;
+        }
+
+        .score-board {
+            color: white;
+            font-size: 24px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            width: 800px;
+        }
+
+        .score {
+            padding: 10px 20px;
+            background-color: #333;
+            border-radius: 5px;
+        }
+
+        canvas {
+            border: 2px solid white;
+            background-color: black;
+            display: block;
+        }
+
+        .controls {
+            color: white;
+            margin-top: 20px;
+            font-size: 16px;
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 24px;
+            display: none;
+        }
+
+        .restart-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        .restart-btn:hover {
+            background-color: #45a049;
+        }
+
+        .difficulty-selector {
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .difficulty-selector select {
+            padding: 5px 10px;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="difficulty-selector">
+            <label for="difficulty">AI難易度:</label>
+            <select id="difficulty">
+                <option value="easy">初級 (Easy)</option>
+                <option value="medium">中級 (Medium)</option>
+                <option value="hard">上級 (Hard)</option>
+            </select>
+        </div>
+        
+        <div class="score-board">
+            <div class="score">プレイヤー: <span id="player-score">0</span></div>
+            <div class="score">AI: <span id="ai-score">0</span></div>
+        </div>
+        
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div class="controls">
+            <p>操作: Wキー (上) / Sキー (下)</p>
+        </div>
+    </div>
+
+    <div class="game-over" id="gameOver">
+        <div id="winner-text"></div>
+        <button class="restart-btn" onclick="game.restart()">再開</button>
+    </div>
+
+    <script>
+        // Pong Game Class
+        class PongGame {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.difficultySelector = document.getElementById('difficulty');
+                
+                // ゲーム設定
+                this.canvasWidth = 800;
+                this.canvasHeight = 600;
+                this.paddleWidth = 20;
+                this.paddleHeight = 100;
+                this.ballSize = 12;
+                this.paddleSpeed = 8;
+                this.ballSpeed = 6;
+                this.maxScore = 5;
+                
+                // ゲーム状態
+                this.gameRunning = false;
+                this.playerScore = 0;
+                this.aiScore = 0;
+                
+                // パドル位置
+                this.playerPaddle = {
+                    x: 50,
+                    y: this.canvasHeight / 2 - this.paddleHeight / 2,
+                    dy: 0
+                };
+                
+                this.aiPaddle = {
+                    x: this.canvasWidth - 50 - this.paddleWidth,
+                    y: this.canvasHeight / 2 - this.paddleHeight / 2,
+                    dy: 0
+                };
+                
+                // ボール
+                this.ball = {
+                    x: this.canvasWidth / 2,
+                    y: this.canvasHeight / 2,
+                    dx: 0,
+                    dy: 0
+                };
+                
+                // キー入力
+                this.keys = {};
+                
+                this.init();
+            }
+            
+            init() {
+                // イベントリスナー設定
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key.toLowerCase()] = true;
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key.toLowerCase()] = false;
+                });
+                
+                this.difficultySelector.addEventListener('change', () => {
+                    this.updateDifficulty();
+                });
+                
+                this.start();
+            }
+            
+            start() {
+                this.gameRunning = true;
+                this.resetBall();
+                this.gameLoop();
+            }
+            
+            resetBall() {
+                this.ball.x = this.canvasWidth / 2;
+                this.ball.y = this.canvasHeight / 2;
+                
+                // ランダムな方向にボールを発射
+                const angle = (Math.random() - 0.5) * Math.PI / 2; // -45度から45度
+                const direction = Math.random() < 0.5 ? -1 : 1; // 左右ランダム
+                
+                this.ball.dx = direction * this.ballSpeed * Math.cos(angle);
+                this.ball.dy = this.ballSpeed * Math.sin(angle);
+            }
+            
+            updateDifficulty() {
+                // 難易度変更時の処理（必要に応じて実装）
+                console.log('難易度変更:', this.difficultySelector.value);
+            }
+            
+            updatePlayerPaddle() {
+                // キー入力に基づいてプレイヤーパドルを移動
+                if (this.keys['w'] && this.playerPaddle.y > 0) {
+                    this.playerPaddle.y -= this.paddleSpeed;
+                }
+                if (this.keys['s'] && this.playerPaddle.y < this.canvasHeight - this.paddleHeight) {
+                    this.playerPaddle.y += this.paddleSpeed;
+                }
+            }
+            
+            updateAIPaddle() {
+                const difficulty = this.difficultySelector.value;
+                let targetY = this.canvasHeight / 2 - this.paddleHeight / 2;
+                
+                switch (difficulty) {
+                    case 'easy':
+                        // 初級: 現在のボールのY座標に追従
+                        targetY = this.ball.y - this.paddleHeight / 2;
+                        break;
+                        
+                    case 'medium':
+                        // 中級: ボールの軌道を予測
+                        targetY = this.predictBallPosition();
+                        break;
+                        
+                    case 'hard':
+                        // 上級: 予測 + プレイヤーの動きを読む
+                        targetY = this.predictBallPositionWithPlayerReading();
+                        break;
+                }
+                
+                // パドルを目標位置に移動
+                const diff = targetY - this.aiPaddle.y;
+                if (Math.abs(diff) > 5) {
+                    this.aiPaddle.y += diff > 0 ? this.paddleSpeed : -this.paddleSpeed;
+                }
+                
+                // 画面外に出ないように制限
+                this.aiPaddle.y = Math.max(0, Math.min(this.canvasHeight - this.paddleHeight, this.aiPaddle.y));
+            }
+            
+            predictBallPosition() {
+                // ボールがAIパドルのX座標に到達したときのY座標を予測
+                if (this.ball.dx <= 0) return this.canvasHeight / 2 - this.paddleHeight / 2;
+                
+                const timeToReachPaddle = (this.aiPaddle.x - this.ball.x) / this.ball.dx;
+                let predictedY = this.ball.y + this.ball.dy * timeToReachPaddle;
+                
+                // 壁での跳ね返りを考慮
+                while (predictedY < 0 || predictedY > this.canvasHeight) {
+                    if (predictedY < 0) {
+                        predictedY = -predictedY;
+                    } else if (predictedY > this.canvasHeight) {
+                        predictedY = 2 * this.canvasHeight - predictedY;
+                    }
+                }
+                
+                return predictedY - this.paddleHeight / 2;
+            }
+            
+            predictBallPositionWithPlayerReading() {
+                // 中級の予測に加えて、プレイヤーの動きを読む
+                let predictedY = this.predictBallPosition();
+                
+                // プレイヤーが動いている場合、その動きを考慮
+                if (this.keys['w'] || this.keys['s']) {
+                    const playerMovement = this.keys['w'] ? -1 : 1;
+                    // プレイヤーの動きに基づいて予測を調整（わざと反応を遅らせる）
+                    predictedY += playerMovement * 20;
+                }
+                
+                // ランダムな「揺らぎ」を追加してゲームを面白くする
+                predictedY += (Math.random() - 0.5) * 30;
+                
+                return predictedY;
+            }
+            
+            updateBall() {
+                // ボールの位置を更新
+                this.ball.x += this.ball.dx;
+                this.ball.y += this.ball.dy;
+                
+                // 上下の壁での跳ね返り
+                if (this.ball.y <= 0 || this.ball.y >= this.canvasHeight) {
+                    this.ball.dy = -this.ball.dy;
+                }
+                
+                // パドルとの衝突判定
+                this.checkPaddleCollision();
+                
+                // 得点判定
+                this.checkScoring();
+            }
+            
+            checkPaddleCollision() {
+                // プレイヤーパドルとの衝突
+                if (this.ball.x <= this.playerPaddle.x + this.paddleWidth &&
+                    this.ball.x >= this.playerPaddle.x &&
+                    this.ball.y >= this.playerPaddle.y &&
+                    this.ball.y <= this.playerPaddle.y + this.paddleHeight) {
+                    
+                    this.handlePaddleHit(this.playerPaddle, 1);
+                }
+                
+                // AIパドルとの衝突
+                if (this.ball.x >= this.aiPaddle.x &&
+                    this.ball.x <= this.aiPaddle.x + this.paddleWidth &&
+                    this.ball.y >= this.aiPaddle.y &&
+                    this.ball.y <= this.aiPaddle.y + this.paddleHeight) {
+                    
+                    this.handlePaddleHit(this.aiPaddle, -1);
+                }
+            }
+            
+            handlePaddleHit(paddle, direction) {
+                // パドルのどこに当たったかによって跳ね返り角度を調整
+                const hitPosition = (this.ball.y - paddle.y) / this.paddleHeight;
+                const angle = (hitPosition - 0.5) * Math.PI / 3; // -30度から30度
+                
+                this.ball.dx = direction * this.ballSpeed * Math.cos(angle);
+                this.ball.dy = this.ballSpeed * Math.sin(angle);
+                
+                // ボールがパドルにめり込まないように位置を調整
+                if (direction > 0) {
+                    this.ball.x = paddle.x + this.paddleWidth;
+                } else {
+                    this.ball.x = paddle.x - this.ballSize;
+                }
+            }
+            
+            checkScoring() {
+                // 左側の壁（プレイヤー側）を通過
+                if (this.ball.x <= 0) {
+                    this.aiScore++;
+                    this.updateScore();
+                    this.resetBall();
+                }
+                
+                // 右側の壁（AI側）を通過
+                if (this.ball.x >= this.canvasWidth) {
+                    this.playerScore++;
+                    this.updateScore();
+                    this.resetBall();
+                }
+            }
+            
+            updateScore() {
+                document.getElementById('player-score').textContent = this.playerScore;
+                document.getElementById('ai-score').textContent = this.aiScore;
+                
+                // ゲーム終了判定
+                if (this.playerScore >= this.maxScore || this.aiScore >= this.maxScore) {
+                    this.endGame();
+                }
+            }
+            
+            endGame() {
+                this.gameRunning = false;
+                const winnerText = document.getElementById('winner-text');
+                const gameOver = document.getElementById('gameOver');
+                
+                if (this.playerScore >= this.maxScore) {
+                    winnerText.textContent = 'プレイヤーの勝利！';
+                } else {
+                    winnerText.textContent = 'AIの勝利！';
+                }
+                
+                gameOver.style.display = 'block';
+            }
+            
+            restart() {
+                this.playerScore = 0;
+                this.aiScore = 0;
+                this.updateScore();
+                document.getElementById('gameOver').style.display = 'none';
+                this.start();
+            }
+            
+            draw() {
+                // キャンバスをクリア
+                this.ctx.fillStyle = 'black';
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+                
+                // センターラインを描画
+                this.ctx.strokeStyle = 'white';
+                this.ctx.setLineDash([10, 10]);
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.canvasWidth / 2, 0);
+                this.ctx.lineTo(this.canvasWidth / 2, this.canvasHeight);
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+                
+                // プレイヤーパドルを描画
+                this.ctx.fillStyle = 'white';
+                this.ctx.fillRect(
+                    this.playerPaddle.x,
+                    this.playerPaddle.y,
+                    this.paddleWidth,
+                    this.paddleHeight
+                );
+                
+                // AIパドルを描画
+                this.ctx.fillRect(
+                    this.aiPaddle.x,
+                    this.aiPaddle.y,
+                    this.paddleWidth,
+                    this.paddleHeight
+                );
+                
+                // ボールを描画
+                this.ctx.beginPath();
+                this.ctx.arc(this.ball.x, this.ball.y, this.ballSize / 2, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+            
+            gameLoop() {
+                if (!this.gameRunning) return;
+                
+                this.updatePlayerPaddle();
+                this.updateAIPaddle();
+                this.updateBall();
+                this.draw();
+                
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        }
+        
+        // ゲーム開始
+        const game = new PongGame();
+    </script>
+</body>
+</html> 
